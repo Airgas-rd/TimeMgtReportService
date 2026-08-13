@@ -76,12 +76,13 @@ namespace TimeMgtReportService
             smtp.MessageSent += this.Smtp_MessageSent;
             smtp.Connected += this.Smtp_Connected;
             smtp.Disconnected += this.Smtp_Disconnected;
-            smtp.Connect(this.emailSettings.Host, emailSettings.Port, SecureSocketOptions.Auto);
+            //smtp.Connect(this.emailSettings.Host, emailSettings.Port, SecureSocketOptions.Auto);
             //smtp.Authenticate();
             this.logger.LogInformation("Sending email ... " + email.To);
 
             if (!this.emailSettings.DisableEmailing)
             {
+                smtp.Connect(this.emailSettings.Host, emailSettings.Port, SecureSocketOptions.Auto);
                 await smtp.SendAsync(email);
             }
             

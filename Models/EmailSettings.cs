@@ -11,8 +11,8 @@
         public int Port { get; set; }
         public int DayOfWeek { get; set; }
         public int DataRetrievedUpToDays { get; set; }
-        public int MissLogDays10 { get; set; }
-        public int MissLogDays15 { get; set; }
+        public int MissLogDaysX { get; set; }
+        public int MissLogDaysY { get; set; }
         public string AttachmentPath { get; set; }
         public bool DisableEmailing { get; set; }
     }

@@ -1,14 +1,9 @@
-﻿using System.Diagnostics;
-using System.Globalization;
-using System.Linq;
+﻿using System.Globalization;
 using CsvHelper;
 using Microsoft.Extensions.Options;
-using Org.BouncyCastle.Pqc.Crypto.Lms;
 using TimeMgtReportService.Helpers;
 using TimeMgtReportService.Interfaces;
 using TimeMgtReportService.Models;
-using static System.Runtime.InteropServices.JavaScript.JSType;
-using Boolean = System.Boolean;
 
 namespace TimeMgtReportService
 {
@@ -30,24 +25,24 @@ namespace TimeMgtReportService
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            TimeSpan nextSendingTimeDiff = TimeSpan.Zero;
+            var nextSendingTimeDiff = TimeSpan.Zero;
 
             while (!stoppingToken.IsCancellationRequested)
             {
                 this._logger.LogInformation("====== Schedule Execution Starts ======");
                 try
                 {
-                    _retrievedStartDate = DateTime.Now.AddDays(-this._options.Value.DataRetrievedUpToDays);
-                    DateTime startDate = _retrievedStartDate;
-                    DateTime endDate = DateTime.Now;
+                    this._retrievedStartDate = DateTime.Now.AddDays(-this._options.Value.DataRetrievedUpToDays);
+                    var startDate = this._retrievedStartDate;
+                    var endDate = DateTime.Now;
                     var timeLogs = this._databaseService.GetTimeLogsRpt(startDate, endDate).ToList();
-                    var users = _databaseService.GetUsers();
+                    var users = this._databaseService.GetUsers();
 
-                    var managers = _databaseService.GetManagers();
+                    var managers = this._databaseService.GetManagers();
                     var noLogsUsers = Helper.GetUserNoLog(users, timeLogs);
-                    var noLog10DaysUsers = Helper.GetUserMissingDaysNoLog(timeLogs, this._options.Value.MissLogDays10)
-                        .Join(users, s=>s.Id, usrs=>usrs.Id, (s, usrs)=> new User(usrs.Id, usrs.GroupId, usrs.Email, usrs.UserName)).ToList();
-                    //var noLog15DaysUsers = Helper.GetUserMissingDaysNoLog(timeLogs, this._options.Value.MissLogDays15);
+                    var noLogXDaysUsers = Helper.GetUserMissingDaysNoLog(timeLogs, this._options.Value.MissLogDaysX)
+                        .Join(users, s=>s.Id, usrs=>usrs.Id, (s, usrs)=> new User(usrs.Id, usrs.GroupId, usrs.UserName, usrs.Email)).ToList();
+                    var noLogYDaysUsers = Helper.GetUserMissingDaysNoLog(timeLogs, this._options.Value.MissLogDaysY);
 
                     //testing 
                     //var systemEngineering = users.Where(s => s.GroupId == 5 || s.GroupId == 4);
@@ -55,17 +50,16 @@ namespace TimeMgtReportService
                     //var employeeEmails10days = Helper.CreatingEmployeeEmail(systemEngineering.ToList());
                     //var managerEmail = Helper.GetManagerEmail(managers.ToList(), 1);
 
-                    var employeeEmailsNo10days = Helper.CreatingEmployeeEmail(noLog10DaysUsers);
-                    //var managerEmailsNo15days = Helper.CreatingManagerEmail(noLog15DaysUsers, managers.ToList());
-                    var managerEmailsNoLogs = Helper.CreatingManagerEmail(noLogsUsers, managers.ToList());
+                    var employeeEmailsNoXdays = Helper.CreatingEmployeeEmail(noLogXDaysUsers);
+                    var managerEmailsNoYdays = Helper.CreatingManagerEmail(noLogYDaysUsers, managers.ToList());
 
-                    List<NotificationEmail>?bossEmailsNoLogs = new List<NotificationEmail>();
+                    var bossEmailsNoLogs = new List<NotificationEmail>();
                     var valueEmailToBoss = this._options.Value.EmailToBoss;
-                    if (valueEmailToBoss != null)
+                    if (valueEmailToBoss != null && noLogsUsers.Any())
                     {
                         if (valueEmailToBoss.Contains(","))
                         {
-                            foreach (string email in valueEmailToBoss.Split(",").ToArray())
+                            foreach (var email in valueEmailToBoss.Split(",").ToArray())
                             {
                                 bossEmailsNoLogs.Add(Helper.CreatingRobEmail(noLogsUsers, email.Trim()));
                             }
@@ -85,32 +79,26 @@ namespace TimeMgtReportService
                     //managerEmailsNologs.Skip(1).First().Email = "wenli.huang@airgas.com";
                     //testing
 
-                    List<NotificationEmail>? finalEmails = new List<NotificationEmail>();
+                    var finalEmails = new List<NotificationEmail>();
 
                     //sending email
-                    if (employeeEmailsNo10days.Count > 0)
+                    if (employeeEmailsNoXdays.Count > 0)
                     {
-                        await SendingEmail(employeeEmailsNo10days);
-                        finalEmails = finalEmails.Concat(employeeEmailsNo10days).ToList();
+                        await this.SendingEmail(employeeEmailsNoXdays);
+                        finalEmails = finalEmails.Concat(employeeEmailsNoXdays).ToList();
                     }
 
-                    if (managerEmailsNoLogs.Count > 0)
+                    if (managerEmailsNoYdays.Count > 0)
                     {
-                        await SendingEmail(managerEmailsNoLogs);
-                        finalEmails = finalEmails.Concat(managerEmailsNoLogs).ToList();
+                        await this.SendingEmail(managerEmailsNoYdays);
+                        finalEmails = finalEmails.Concat(managerEmailsNoYdays).ToList();
                     }
 
                     if (bossEmailsNoLogs.Count > 0)
                     {
-                        await SendingEmail(bossEmailsNoLogs);
+                        await this.SendingEmail(bossEmailsNoLogs);
                         finalEmails = finalEmails.Concat(bossEmailsNoLogs).ToList();
                     }
-
-                    //if (!string.IsNullOrEmpty(robEmailsNoLogs.Email))
-                    //{
-                    //    await SendingEmail(robEmailsNoLogs);
-                    //    FinalEmails.Add(robEmailsNoLogs);
-                    //}
 
                     //Write into csv file ...
                     this.SaveCsvFile(timeLogs.ToList(), startDate, endDate);
@@ -121,9 +109,12 @@ namespace TimeMgtReportService
                     Thread.Sleep(3000);
 
                     //The next sending day ...
-                    this._logger.LogInformation("Next Review Date - " + Helper.GetNextWeekday((DayOfWeek)this._options.Value.DayOfWeek).AddHours(+1));
+                    //this._logger.LogInformation("Next Review Date - " + Helper.GetNextWeekday((DayOfWeek)this._options.Value.DayOfWeek).AddHours(+1));
+                    this._logger.LogInformation("Next Review Date - " + DateTime.Now.AddHours(+24));
                     //The reason for adding extra hour is to avoid collision with AcuGrav service emailing time.
-                    nextSendingTimeDiff = (Helper.GetNextWeekday((DayOfWeek)this._options.Value.DayOfWeek).AddHours(+1) - DateTime.Now);
+                    //nextSendingTimeDiff = (Helper.GetNextWeekday((DayOfWeek)this._options.Value.DayOfWeek).AddHours(+1) - DateTime.Now);
+                    //Set nest sending time after 24 hours.
+                    nextSendingTimeDiff = new TimeSpan(24, 0, 0); 
                     this._logger.LogInformation("Differences in seconds - " + nextSendingTimeDiff.TotalSeconds);
                     this._logger.LogInformation("Converting to seconds - " + Convert.ToInt32(nextSendingTimeDiff.TotalSeconds));
                 }
@@ -149,54 +140,19 @@ namespace TimeMgtReportService
             return base.StopAsync(cancellationToken);
         }
 
-        private async Task SendingEmail()
-        {
-            MailRequest mailRequest = new MailRequest
-            {
-                ToEmail = this._options.Value.EmailTo,
-                Subject = this._options.Value.Subject,
-                Body = this.GetHtmlContent()
-            };
-            await this._emailService.SendEmailAsync(mailRequest);
-        }
-
-        private Task SendingEmail(NotificationEmail notification)
-        {
-            MailRequest mailRequest = new MailRequest
-            {
-                ToEmail = notification.Email,
-                Subject = notification.Subject,
-                Body = this.GetHtmlContent(notification.Body)
-            };
-
-            this._emailService.SendEmailAsync(mailRequest);
-            return Task.CompletedTask;
-        }
-
         private Task SendingEmail(List<NotificationEmail> notifications)
         {
-            foreach (var notification in notifications)
+            foreach (var mailRequest in notifications.Select(notification => new MailRequest
+                     {
+                         ToEmail = notification.Email,
+                         Subject = notification.Subject,
+                         Body = this.GetHtmlContent(notification.Body)
+                     }))
             {
-                MailRequest mailRequest = new MailRequest
-                {
-                    ToEmail = notification.Email,
-                    Subject = notification.Subject,
-                    Body = this.GetHtmlContent(notification.Body)
-                };
-
                 this._emailService.SendEmailAsync(mailRequest);
             }
 
             return Task.FromResult(Task.CompletedTask);
-        }
-
-        private string GetHtmlContent()
-        {
-            string response = "<h3>Time-Management Weekly Report</h3>";
-            response += "<h4>Please review the attachment</h4>";
-            response += "<h4>From " + DateTime.Now.AddDays(-7).ToString("MM-dd-yyyy") + " To " + DateTime.Now.ToString("MM-dd-yyyy") + "</h4>";
-            response += "<div><h5>Contact the support if there is any issue</h5></div>";
-            return response;
         }
 
         private string GetHtmlContent(string content)
