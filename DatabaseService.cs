@@ -14,34 +14,6 @@ namespace TimeMgtReportService
             this.connectionString = configuration.GetConnectionString("dbConnection");
         }
 
-        /*
-        public string? updateuser()
-        {
-            string? response = string.Empty;
-            try
-            {
-                using (SqlConnection sql = new SqlConnection(this.connectionString))
-                {
-                    SqlCommand cmd = new SqlCommand("sp_updatestatus", sql);
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    sql.Open();
-                    using (var reader = cmd.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            response = reader["response"].ToString();
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
-
-            return response;
-        }*/
-
         public IEnumerable<User> GetUsers()
         {
             using (SqlConnection sql = new SqlConnection(this.connectionString))
@@ -128,7 +100,8 @@ namespace TimeMgtReportService
                             string subtask = reader.GetFieldValue<string>(13);
                             string email = reader.GetFieldValue<string>(14);
                             int userId = reader.GetFieldValue<int>(15);
-                            TimeLogReport timeLogsRpt = new TimeLogReport(id, user, groupId, group, dateTime, timeOff, hours, workHome, jobDetail, reason, project, task, subtask, email, userId);
+                            WorkingDay workHour = (WorkingDay)reader.GetFieldValue<int>(16);
+                            TimeLogReport timeLogsRpt = new TimeLogReport(id, user, groupId, group, dateTime, timeOff, hours, workHome, jobDetail, reason, project, task, subtask, email, userId, workHour);
                             testing.Add(timeLogsRpt);
                         }
                         catch (Exception e)
@@ -172,7 +145,8 @@ namespace TimeMgtReportService
                         string subtask = reader.GetFieldValue<string>(13);
                         string email = reader.GetFieldValue<string>(14);
                         int userId = reader.GetFieldValue<int>(15);
-                        TimeLogReport timeLogsRpt = new TimeLogReport(id, user, groupId, group, dateTime, timeOff, hours, workHome, jobDetail, reason, project, task, subtask, email, userId);
+                        WorkingDay workHour = (WorkingDay)reader.GetFieldValue<int>(16);
+                        TimeLogReport timeLogsRpt = new TimeLogReport(id, user, groupId, group, dateTime, timeOff, hours, workHome, jobDetail, reason, project, task, subtask, email, userId, workHour);
                         yield return timeLogsRpt;
                     }
                 }

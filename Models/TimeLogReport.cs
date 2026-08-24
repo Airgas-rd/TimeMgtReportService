@@ -11,7 +11,7 @@ namespace TimeMgtReportService.Models
 {
     public class TimeLogReport : ICsvReport
     {
-        public TimeLogReport(int id, string userName, int groupId, string group, DateTime timestamp, bool timeOff, double hours, bool workHome, string jobDetail, string? reason, string project, string task, string subTask, string email, int userId)
+        public TimeLogReport(int id, string userName, int groupId, string group, DateTime timestamp, bool timeOff, double hours, bool workHome, string jobDetail, string? reason, string project, string task, string subTask, string email, int userId, WorkingDay workingHour)
         {
             this.Id = id;
             this.UserName = userName;
@@ -28,6 +28,7 @@ namespace TimeMgtReportService.Models
             this.SubTask = subTask;
             this.Email = email;
             this.UserId = userId;
+            this.WorkingHour = workingHour;
         }
 
         public int Id { get; set; }
@@ -48,5 +49,6 @@ namespace TimeMgtReportService.Models
         public string SubTask { get; set; }
         public string Email { get; set; }
         public int UserId { get; set; }
+        public WorkingDay WorkingHour { get; set; }
     }
 }

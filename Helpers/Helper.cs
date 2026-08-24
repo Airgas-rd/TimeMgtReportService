@@ -7,9 +7,11 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using TimeMgtReportService.Models;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 using File = TimeMgtReportService.Models.File;
 
 namespace TimeMgtReportService.Helpers
@@ -87,10 +89,10 @@ namespace TimeMgtReportService.Helpers
             return GetUserxDaysNoLog(timeLogReports, missingDays);
         }
 
-        //public static List<User> GetUser15DaysNoLog(IEnumerable<TimeLogReport> timeLogReports)
-        //{
-        //    return GetUserxDaysNoLog(timeLogReports, 15);
-        //}
+        public static List<List<User>> GetUserMissingDaysNoLog(IEnumerable<TimeLogReport> timeLogReports, int missingDays, DateTime startDate, DateTime endDate)
+        {
+            return GetUserxDaysNoLog(timeLogReports, missingDays, startDate, endDate);
+        }
 
         public static List<User> GetUserNoLog(IEnumerable<User> regUsers, IEnumerable<TimeLogReport> timeLogReports)
         {
@@ -113,25 +115,37 @@ namespace TimeMgtReportService.Helpers
             return emails;
         }
 
-        public static List<NotificationEmail> CreatingManagerEmail(List<User> users, List<Manager> mangers)
+        public static List<NotificationEmail> CreatingEmployeeEmail(List<List<User>> users)
+        {
+            var emails = (from usr in users
+                select new NotificationEmail
+                {
+                    Email = usr.First().Email,
+                    Subject = "Time Management Notification",
+                    Body =  $"This is a friendly notification - You have missed logging date(s): {string.Join(", ", usr.Select(d => d.Date.ToString("yyyy-MM-dd")))}."
+                }).ToList();
+            return emails;
+        }
+
+        public static List<NotificationEmail> CreatingManagerEmail(List<List<User>> users, List<Manager> mangers)
         {
             List <NotificationEmail> managerEmails = new List<NotificationEmail>();
 
             foreach (var usr in users)
             {
-                var mgrEmails = GetManagerEmail(mangers, usr.GroupId).Select(s => s.Email);
+                var mgrEmails = GetManagerEmail(mangers, usr.First().GroupId).Select(s => s.Email);
 
                 var mgrMails = mgrEmails.ToList();
                 if (mgrMails.Count() > 1)
                 {
                     foreach (var mgrMail in mgrMails)
                     {
-                        AddManageNotification(managerEmails, mgrMail, usr);
+                        AddManageNotification(managerEmails, mgrMail, usr.First());
                     }
                 }
                 else if (mgrMails.Count() == 1)
                 {
-                    AddManageNotification(managerEmails, mgrMails.FirstOrDefault(), usr);
+                    AddManageNotification(managerEmails, mgrMails.FirstOrDefault(), usr.First());
                 }
             }
 
@@ -170,15 +184,21 @@ namespace TimeMgtReportService.Helpers
                 NotificationEmail notification = new NotificationEmail();
                 notification.Email = email;
                 notification.Subject = config.GetSection("EmailSettings:Subject").Value!;
-                notification.Body = "Your group's employee(s) has/have over 15 days no time logs." + "<br/><br/>" + employee.UserName + "<br/>";
+                notification.Body = "Your group's employee(s) has/have over 5 days no time logs." + "<br/><br/>" + employee.UserName + "<br/>";
                 managerEmails.Add(notification);
             }
         }
 
         private static List<User> GetUserxDaysNoLog(IEnumerable<TimeLogReport> timeLogReports, int nDays)
         {
-            int minDays = 15 - nDays;
-            var userswith15days = (from timelog in timeLogReports
+            // test
+            var logReports = timeLogReports as TimeLogReport[] ?? timeLogReports.ToArray();
+            var testRpt = logReports.ToList().Where(s => s.TimeStamp.Day < DateTime.Now.AddDays(-5).Day).ToList();
+            //var listOfMondays2Fridays = GetMondaysAndFridays();
+            // test
+
+            int minDays = 6 - nDays;
+            var userswith15daysA = (from timelog in testRpt.Where(s=>s.WorkingHour == WorkingDay.MTWHF)
                 group timelog by new { timelog.UserId, timelog.UserName, timelog.GroupId, timelog.Email, timelog.TimeStamp.Date} into grp
                 select new
                 {
@@ -189,17 +209,107 @@ namespace TimeMgtReportService.Helpers
                     date = grp.Key.Date,
                 }).ToList();
 
-            var userWithMissingLogNumber = userswith15days.GroupBy(n => 
-                new {key = n.key, username= n.username, groupid = n.groupid, email = n.email}).Select(n => new 
+            var userWithMissingLogNumber = userswith15daysA.GroupBy(n => 
+                new {key = n.key, username= n.username, groupid = n.groupid, email = n.email, n.date}).Select(n => new 
             {
                 Id = n.Key.key,
                 UserName= n.Key.username,
                 GroupId = n.Key.groupid,
                 Email = n.Key.email,
                 cnt = n.Count()
-            }).OrderBy(n => n.Id).Where(n=> n.cnt <= minDays).Select( s=> new User(s.Id, s.GroupId, s.UserName, s.Email)).ToList();
+            }).OrderBy(n => n.Id).Where(n=> n.cnt < minDays).Select( s=> new User(s.Id, s.GroupId, s.UserName, s.Email, s.cnt)).ToList();
+
+            var userswith15daysB = (from timelog in testRpt.Where(s => s.WorkingHour is WorkingDay.MTWT or WorkingDay.TWTF)
+                                    group timelog by new { timelog.UserId, timelog.UserName, timelog.GroupId, timelog.Email, timelog.TimeStamp.Date } into grp
+                select new
+                {
+                    key = grp.Key.UserId,
+                    username = grp.Key.UserName,
+                    groupid = grp.Key.GroupId,
+                    email = grp.Key.Email,
+                    date = grp.Key.Date,
+                }).ToList();
+
+            var userWithMissingLogNumber2 = userswith15daysB.GroupBy(n =>
+                new { key = n.key, username = n.username, groupid = n.groupid, email = n.email, n.date }).Select(n => new
+            {
+                Id = n.Key.key,
+                UserName = n.Key.username,
+                GroupId = n.Key.groupid,
+                Email = n.Key.email,
+                cnt = n.Count()
+            }).OrderBy(n => n.Id).Where(n => n.cnt < minDays - 1).Select(s => new User(s.Id, s.GroupId, s.UserName, s.Email, s.cnt)).ToList();
+
 
             return userWithMissingLogNumber;
+        }
+
+        private static List<List<User>> GetUserxDaysNoLog(IEnumerable<TimeLogReport> timeLogReports, int nDays, DateTime startDate, DateTime endDate)
+        {
+            var listOfMondays2Fridays = GetMondaysAndFridays(startDate, endDate);
+            var groupedTimeReports = timeLogReports
+                .GroupBy(t => t.UserId)
+                .Select(group => group.ToList())
+                .ToList();
+
+            var missingDatesUsers = new List<User>();
+
+            foreach (var date in listOfMondays2Fridays)
+            {
+                foreach (var usr in groupedTimeReports)
+                {
+                    foreach (var tmRpt in usr)
+                    {
+                        if (usr.All(s => s.TimeStamp.Date != date.Date) || usr.Where(d => d.TimeStamp.Date == date.Date).Sum(s => s.Hours) == 0)
+                        {
+                            if (missingDatesUsers.Any(s => s.Date.Date == date.Date && s.Id == tmRpt.UserId))
+                            {
+                                continue;
+                            }
+
+                            if (IsMatchingWorkingHour(date, tmRpt.WorkingHour))
+                            {
+                                missingDatesUsers.Add(new User(tmRpt.UserId, tmRpt.GroupId, tmRpt.UserName, tmRpt.Email, date, tmRpt.WorkingHour, 0));
+                            }
+                        }
+                    }
+                }
+            }
+
+            var retMissingDates = missingDatesUsers
+                .GroupBy(t => t.Id)
+                .Select(group => group.ToList())
+                .ToList();
+
+            return retMissingDates;
+        }
+
+        private static bool IsMatchingWorkingHour(DateTime day, WorkingDay workingDay)
+        {
+            var retVal = workingDay switch
+            {
+                WorkingDay.MTWHF => true,
+                WorkingDay.MTWT => day.DayOfWeek != DayOfWeek.Friday,
+                WorkingDay.TWTF => day.DayOfWeek != DayOfWeek.Monday,
+                _ => throw new ArgumentOutOfRangeException(nameof(workingDay), workingDay, null)
+            };
+
+            return retVal;
+        }
+
+        private static List<DateTime> GetMondaysAndFridays(DateTime startDate, DateTime endDate)
+        {
+            var mondaysAndFridays = new List<DateTime>();
+
+            for (var date = startDate; date <= endDate; date = date.AddDays(1))
+            {
+                if (date is not { DayOfWeek: DayOfWeek.Saturday } && date is not { DayOfWeek: DayOfWeek.Sunday })
+                {
+                    mondaysAndFridays.Add(date);
+                }
+            }
+
+            return mondaysAndFridays;
         }
     }
 }

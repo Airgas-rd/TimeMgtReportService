@@ -36,22 +36,17 @@ namespace TimeMgtReportService
                     var startDate = this._retrievedStartDate;
                     var endDate = DateTime.Now;
                     var timeLogs = this._databaseService.GetTimeLogsRpt(startDate, endDate).ToList();
+                    var timeMonthLogs = this._databaseService.GetTimeLogsRpt(endDate.AddMonths(-1).AddDays(-1), endDate).ToList();
                     var users = this._databaseService.GetUsers();
 
                     var managers = this._databaseService.GetManagers();
-                    var noLogsUsers = Helper.GetUserNoLog(users, timeLogs);
-                    var noLogXDaysUsers = Helper.GetUserMissingDaysNoLog(timeLogs, this._options.Value.MissLogDaysX)
-                        .Join(users, s=>s.Id, usrs=>usrs.Id, (s, usrs)=> new User(usrs.Id, usrs.GroupId, usrs.UserName, usrs.Email)).ToList();
-                    var noLogYDaysUsers = Helper.GetUserMissingDaysNoLog(timeLogs, this._options.Value.MissLogDaysY);
+                    var noLogsUsers = Helper.GetUserNoLog(users, timeMonthLogs);
+                    var noLogOneDaysUsers = Helper.GetUserMissingDaysNoLog(timeLogs, this._options.Value.MissLogDaysX, startDate, endDate);
+                    var noLogFiveDaysUsers = noLogOneDaysUsers.Where(usr=>usr.Count > 4).ToList();
 
-                    //testing 
-                    //var systemEngineering = users.Where(s => s.GroupId == 5 || s.GroupId == 4);
-                    //var managerEmails = Helper.CreatingManagerEmail(systemEngineering.ToList(), managers.ToList());
-                    //var employeeEmails10days = Helper.CreatingEmployeeEmail(systemEngineering.ToList());
-                    //var managerEmail = Helper.GetManagerEmail(managers.ToList(), 1);
-
-                    var employeeEmailsNoXdays = Helper.CreatingEmployeeEmail(noLogXDaysUsers);
-                    var managerEmailsNoYdays = Helper.CreatingManagerEmail(noLogYDaysUsers, managers.ToList());
+                    var employeeEmailsNoOneDays = Helper.CreatingEmployeeEmail(noLogOneDaysUsers);
+                    
+                    var managerEmailsNoFiveDays = Helper.CreatingManagerEmail(noLogFiveDaysUsers, managers.ToList());
 
                     var bossEmailsNoLogs = new List<NotificationEmail>();
                     var valueEmailToBoss = this._options.Value.EmailToBoss;
@@ -70,28 +65,19 @@ namespace TimeMgtReportService
                         }
                     }
 
-                    //var robEmailsNoLogs = Helper.CreatingRobEmail(noLogsUsers, this._options.Value.EmailToBoss);
-
-                    //testing
-                    //managerEmailsNologs.Remove(managerEmailsNologs.First());
-                    //managerEmailsNologs.Remove(managerEmailsNologs.First());
-                    //managerEmailsNologs.First().Email = "wenli.huang@airgas.com";
-                    //managerEmailsNologs.Skip(1).First().Email = "wenli.huang@airgas.com";
-                    //testing
-
                     var finalEmails = new List<NotificationEmail>();
 
                     //sending email
-                    if (employeeEmailsNoXdays.Count > 0)
+                    if (employeeEmailsNoOneDays.Count > 0)
                     {
-                        await this.SendingEmail(employeeEmailsNoXdays);
-                        finalEmails = finalEmails.Concat(employeeEmailsNoXdays).ToList();
+                        await this.SendingEmail(employeeEmailsNoOneDays);
+                        finalEmails = finalEmails.Concat(employeeEmailsNoOneDays).ToList();
                     }
 
-                    if (managerEmailsNoYdays.Count > 0)
+                    if (managerEmailsNoFiveDays.Count > 0)
                     {
-                        await this.SendingEmail(managerEmailsNoYdays);
-                        finalEmails = finalEmails.Concat(managerEmailsNoYdays).ToList();
+                        await this.SendingEmail(managerEmailsNoFiveDays);
+                        finalEmails = finalEmails.Concat(managerEmailsNoFiveDays).ToList();
                     }
 
                     if (bossEmailsNoLogs.Count > 0)
