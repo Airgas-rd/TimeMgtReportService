@@ -96,11 +96,11 @@ namespace TimeMgtReportService
 
                     //The next sending day ...
                     //this._logger.LogInformation("Next Review Date - " + Helper.GetNextWeekday((DayOfWeek)this._options.Value.DayOfWeek).AddHours(+1));
-                    this._logger.LogInformation("Next Review Date - " + DateTime.Now.AddHours(+24));
+                    this._logger.LogInformation("Next Review Date - " + (DateTime.Today.DayOfWeek == DayOfWeek.Friday ? DateTime.Now.AddHours(+72) : DateTime.Now.AddHours(+24)));
                     //The reason for adding extra hour is to avoid collision with AcuGrav service emailing time.
                     //nextSendingTimeDiff = (Helper.GetNextWeekday((DayOfWeek)this._options.Value.DayOfWeek).AddHours(+1) - DateTime.Now);
                     //Set nest sending time after 24 hours.
-                    nextSendingTimeDiff = new TimeSpan(24, 0, 0); 
+                    nextSendingTimeDiff = DateTime.Today.DayOfWeek == DayOfWeek.Friday ? new TimeSpan(72, 0, 0) : new TimeSpan(24, 0, 0); 
                     this._logger.LogInformation("Differences in seconds - " + nextSendingTimeDiff.TotalSeconds);
                     this._logger.LogInformation("Converting to seconds - " + Convert.ToInt32(nextSendingTimeDiff.TotalSeconds));
                 }
