@@ -100,7 +100,9 @@ namespace TimeMgtReportService
                     //The reason for adding extra hour is to avoid collision with AcuGrav service emailing time.
                     //nextSendingTimeDiff = (Helper.GetNextWeekday((DayOfWeek)this._options.Value.DayOfWeek).AddHours(+1) - DateTime.Now);
                     //Set nest sending time after 24 hours.
-                    nextSendingTimeDiff = DateTime.Today.DayOfWeek == DayOfWeek.Friday ? new TimeSpan(72, 0, 0) : new TimeSpan(24, 0, 0); 
+
+                    //nextSendingTimeDiff = DateTime.Today.DayOfWeek == DayOfWeek.Friday ? new TimeSpan(72, 0, 0) : new TimeSpan(24, 0, 0); 
+                    nextSendingTimeDiff = this.GetNext5PmWeekday(DateTime.Now, 18).TimeOfDay;
                     this._logger.LogInformation("Differences in seconds - " + nextSendingTimeDiff.TotalSeconds);
                     this._logger.LogInformation("Converting to seconds - " + Convert.ToInt32(nextSendingTimeDiff.TotalSeconds));
                 }
@@ -166,6 +168,25 @@ namespace TimeMgtReportService
                 csv.WriteRecord(record);
                 csv.NextRecord();
             }
+        }
+        private DateTime GetNext5PmWeekday(DateTime now, int clockHour)
+        {
+            // Set target to today at 17:00 (5:00 PM), which means clockHour = 17
+            var target = new DateTime(now.Year, now.Month, now.Day, clockHour, 0, 0);
+
+            // If it is already past 5:00 PM today, move to tomorrow
+            if (now >= target)
+            {
+                target = target.AddDays(1);
+            }
+
+            // Skip Saturday (DayOfWeek.Saturday) and Sunday (DayOfWeek.Sunday)
+            while (target.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            {
+                target = target.AddDays(1);
+            }
+
+            return target;
         }
     }
 }
