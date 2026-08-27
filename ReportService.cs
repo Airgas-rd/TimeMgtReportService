@@ -101,8 +101,8 @@ namespace TimeMgtReportService
                     //nextSendingTimeDiff = (Helper.GetNextWeekday((DayOfWeek)this._options.Value.DayOfWeek).AddHours(+1) - DateTime.Now);
                     //Set nest sending time after 24 hours.
 
-                    //nextSendingTimeDiff = DateTime.Today.DayOfWeek == DayOfWeek.Friday ? new TimeSpan(72, 0, 0) : new TimeSpan(24, 0, 0); 
-                    nextSendingTimeDiff = this.GetNext5PmWeekday(DateTime.Now, 18).TimeOfDay;
+                    // GetNextRunWeekday(today date and time, the time for sending email) will skip Saturday and Sunday.
+                    nextSendingTimeDiff = GetNextRunWeekday(DateTime.Now, 18).TimeOfDay;
                     this._logger.LogInformation("Differences in seconds - " + nextSendingTimeDiff.TotalSeconds);
                     this._logger.LogInformation("Converting to seconds - " + Convert.ToInt32(nextSendingTimeDiff.TotalSeconds));
                 }
@@ -169,7 +169,7 @@ namespace TimeMgtReportService
                 csv.NextRecord();
             }
         }
-        private DateTime GetNext5PmWeekday(DateTime now, int clockHour)
+        private static DateTime GetNextRunWeekday(DateTime now, int clockHour)
         {
             // Set target to today at 17:00 (5:00 PM), which means clockHour = 17
             var target = new DateTime(now.Year, now.Month, now.Day, clockHour, 0, 0);
@@ -181,9 +181,9 @@ namespace TimeMgtReportService
             }
 
             // Skip Saturday (DayOfWeek.Saturday) and Sunday (DayOfWeek.Sunday)
-            while (target.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            if (now.DayOfWeek is DayOfWeek.Friday)
             {
-                target = target.AddDays(1);
+                target = target.AddDays(3);
             }
 
             return target;
