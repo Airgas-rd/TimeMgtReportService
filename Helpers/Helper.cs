@@ -267,7 +267,7 @@ namespace TimeMgtReportService.Helpers
                                 continue;
                             }
 
-                            if (IsMatchingWorkingHour(date, tmRpt.WorkingHour))
+                            if (IsMatchingWorkingHour(date, tmRpt.WorkingHour) && !IsTodayBeforeEndDay(date, 18))
                             {
                                 missingDatesUsers.Add(new User(tmRpt.UserId, tmRpt.GroupId, tmRpt.UserName, tmRpt.Email, date, tmRpt.WorkingHour, 0));
                             }
@@ -295,6 +295,14 @@ namespace TimeMgtReportService.Helpers
             };
 
             return retVal;
+        }
+
+        private static bool IsTodayBeforeEndDay(DateTime day, int cutOverHour)
+        {
+            var isTodayBefore6Pm = DateOnly.FromDateTime(day) == DateOnly.FromDateTime(DateTime.Today)
+                                    && TimeOnly.FromDateTime(day) < new TimeOnly(cutOverHour, 0);
+
+            return isTodayBefore6Pm;
         }
 
         private static List<DateTime> GetMondaysAndFridays(DateTime startDate, DateTime endDate)
